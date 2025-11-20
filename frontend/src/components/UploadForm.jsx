@@ -20,7 +20,10 @@ const UploadForm = ({ setResult }) => {
 
   // dynamic backend base URL
   const backendBaseUrl =
-    process.env.REACT_APP_BACKEND_URL?.replace(/\/+$/, "") || "http://localhost:5000";
+  (process.env.REACT_APP_BACKEND_URL &&
+    process.env.REACT_APP_BACKEND_URL.replace(/\/+$/, "")) ||
+  "http://localhost:5000";
+
 
   // local path provided in your environment (will be transformed into a URL by your tooling)
   const PROJECT_ZIP_LOCAL_PATH = "/mnt/data/Handwritting-reading-AI-main.zip";

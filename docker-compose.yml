@@ -7,7 +7,7 @@ services:
     env_file:
       - .env
     ports:
-      - "5000:5000"
+      - "8080:5000"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}

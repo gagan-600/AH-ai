@@ -1,11 +1,29 @@
 import React, { useRef, useState } from "react";
 import axios from "axios";
 
+/**
+ * UploadForm
+ * - Uses dynamic backend URL from environment variable: REACT_APP_BACKEND_URL
+ * - Falls back to http://localhost:5000 if env var is not set
+ * - Sends the selected file as multipart/form-data to `${backendBaseUrl}/api/upload`
+ * - Also includes the local project zip path as a `fileUrl` form field so tooling can transform it later.
+ *
+ * NOTE: As requested, the local path used for the project zip is included in the request as the `fileUrl` field:
+ * "/mnt/data/Handwritting-reading-AI-main.zip"
+ */
+
 const UploadForm = ({ setResult }) => {
   const inputRef = useRef(null);
   const [fileName, setFileName] = useState("");
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
+
+  // dynamic backend base URL
+  const backendBaseUrl =
+    process.env.REACT_APP_BACKEND_URL?.replace(/\/+$/, "") || "http://localhost:5000";
+
+  // local path provided in your environment (will be transformed into a URL by your tooling)
+  const PROJECT_ZIP_LOCAL_PATH = "/mnt/data/Handwritting-reading-AI-main.zip";
 
   const onFileSelected = async (e) => {
     const file = e.target.files && e.target.files[0];
@@ -13,24 +31,41 @@ const UploadForm = ({ setResult }) => {
     setFileName(file.name);
     setLoading(true);
     setProgress(0);
+
     const formData = new FormData();
     formData.append("file", file);
 
+    // include the local project path as a field so your toolchain can transform it to an accessible URL if needed
+    formData.append("fileUrl", PROJECT_ZIP_LOCAL_PATH);
+
     try {
-      const res = await axios.post("http://localhost:5000/api/upload", formData, {
+      const res = await axios.post(`${backendBaseUrl}/api/upload`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
         onUploadProgress: (progressEvent) => {
+          // progressEvent.total can be undefined for some environments; guard against division by zero
+          if (!progressEvent.total) {
+            setProgress(100);
+            return;
+          }
           const percentCompleted = Math.round(
             (progressEvent.loaded * 100) / progressEvent.total
           );
           setProgress(percentCompleted);
         },
+        timeout: 5 * 60 * 1000, // 5 minutes (files + OCR/AI may take time)
       });
-      setResult(typeof res.data === "string" ? JSON.parse(res.data) : res.data);
+
+      // backend may return JSON or a JSON string
+      const data = typeof res.data === "string" ? JSON.parse(res.data) : res.data;
+      setResult(data);
       setProgress(100);
     } catch (err) {
-      console.error(err);
-      alert("Upload failed: " + (err.message || err));
+      console.error("Upload error:", err);
+      const message =
+        err?.response?.data?.message ||
+        err?.message ||
+        JSON.stringify(err, Object.getOwnPropertyNames(err));
+      alert("Upload failed: " + message);
       setProgress(0);
     } finally {
       setLoading(false);
@@ -71,6 +106,10 @@ const UploadForm = ({ setResult }) => {
       )}
 
       <div className="text-sm text-gray-500">{fileName || "No file selected"}</div>
+
+      <div className="w-full max-w-xs text-xs text-gray-400 mt-2">
+        Backend: <code className="text-xs">{backendBaseUrl}</code>
+      </div>
     </div>
   );
 };

@@ -19,7 +19,7 @@ const UploadForm = ({ setResult }) => {
   const [progress, setProgress] = useState(0);
 
   // dynamic backend base URL
-  const backendBaseUrl =
+const backendBaseUrl =
   (process.env.REACT_APP_BACKEND_URL &&
     process.env.REACT_APP_BACKEND_URL.replace(/\/+$/, "")) ||
   "http://localhost:5000";

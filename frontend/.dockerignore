@@ -1,0 +1,14 @@
+node_modules
+npm-debug.log
+build
+.git
+.gitignore
+.vscode
+.idea
+*.md
+*.swp
+*.swo
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local

@@ -1,0 +1,13 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; }
+
+/* Small typographic and background refinements for a cleaner look */
+body {
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+.shadow-md { box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08); }

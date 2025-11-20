@@ -1,0 +1,11 @@
+target/
+.git
+.gitignore
+.maven
+*.md
+.vscode
+.idea
+*.iml
+*.swp
+*.swo
+*.log

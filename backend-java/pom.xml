@@ -53,7 +53,13 @@
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j</artifactId>
             <version>0.28.0</version>
-                </dependency>
+        </dependency>
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-open-ai</artifactId>
+            <version>0.28.0</version>
+        </dependency>
+
 
         <!-- Jackson -->
         <dependency>

@@ -10,7 +10,7 @@ import java.io.File;
 @Service
 public class OCRService {
 
-    private final ITesseract tesseract;
+  private final ITesseract tesseract;
 
   public OCRService() {
     this.tesseract = new Tesseract();
@@ -23,7 +23,6 @@ public class OCRService {
     this.tesseract.setLanguage("eng");
   }
 
-
   public String extractText(File imageFile) {
     try {
       return tesseract.doOCR(imageFile);
@@ -31,10 +30,9 @@ public class OCRService {
       throw new RuntimeException("OCR failed: " + e.getMessage(), e);
     } catch (UnsatisfiedLinkError e) {
       throw new RuntimeException(
-        "Tesseract native libraries not found. Please install Tesseract OCR and ensure the 'TESSDATA_PREFIX' environment variable is set to the Tesseract installation directory.",
-        e
-      );
+          "Tesseract native libraries not found. Please install Tesseract OCR and ensure the 'TESSDATA_PREFIX' environment variable is set to the Tesseract installation directory.",
+          e);
     }
   }
 }
-//tesseract "C:\Users\Aseuro\Pictures\Screenshot2.jpg" stdout 
+// tesseract "C:\Users\Aseuro\Pictures\Screenshot2.jpg" stdout

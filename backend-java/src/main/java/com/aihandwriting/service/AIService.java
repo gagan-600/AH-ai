@@ -1,5 +1,6 @@
 package com.aihandwriting.service;
 
+import com.aihandwriting.config.LangfuseChatModelListener;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -11,14 +12,8 @@ import dev.langchain4j.model.openai.OpenAiChatModel;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Base64;
-import java.util.UUID;
+import java.util.Collections;
 
 @Service
 public class AIService {
@@ -36,9 +31,6 @@ public class AIService {
     private String langfuseHost;
 
     private final ObjectMapper mapper = new ObjectMapper();
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(5))
-            .build();
 
     /**
      * Extract structured JSON from raw OCR text by calling OpenAI chat completions.
@@ -47,15 +39,26 @@ public class AIService {
      */
     public String extractStructuredData(String rawText) {
         try {
+            System.err.println(
+                    "DEBUG: AIService called with text length: " + (rawText != null ? rawText.length() : "null"));
+            System.err.println("DEBUG: OpenAI Key present: " + (openAiKey != null && !openAiKey.isBlank()));
+
             if (openAiKey == null || openAiKey.isBlank()) {
+                System.err.println("DEBUG: OpenAI Key missing, returning fallback.");
                 return buildAgentFallback(rawText, "OpenAI API key not configured.");
             }
+
+            LangfuseChatModelListener listener = new LangfuseChatModelListener(
+                    langfusePublicKey,
+                    langfuseSecretKey,
+                    langfuseHost);
 
             ChatLanguageModel model = OpenAiChatModel.builder()
                     .apiKey(openAiKey)
                     .modelName("gpt-4o-mini")
                     .temperature(0.0)
                     .timeout(Duration.ofSeconds(30))
+                    .listeners(Collections.singletonList(listener))
                     .build();
 
             String systemText = """
@@ -90,16 +93,11 @@ public class AIService {
 
             String userText = "OCR input:\n" + rawText + "\n\nReturn only the JSON object in the schema described.";
 
-            String assistantText = null;
-            long startTime = System.currentTimeMillis();
-            try {
-                assistantText = model.generate(
-                        SystemMessage.from(systemText),
-                        UserMessage.from(userText)).content().text();
-            } finally {
-                long endTime = System.currentTimeMillis();
-                logToLangfuse(rawText, systemText, userText, assistantText, startTime, endTime);
-            }
+            System.err.println("DEBUG: Calling model.generate...");
+            String assistantText = model.generate(
+                    SystemMessage.from(systemText),
+                    UserMessage.from(userText)).content().text();
+            System.err.println("DEBUG: Model response received.");
 
             String jsonResult = tryExtractJsonFromAssistant(assistantText);
             if (jsonResult == null) {
@@ -159,83 +157,13 @@ public class AIService {
             return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(out);
 
         } catch (Exception e) {
+            e.printStackTrace();
+            System.err.println("❌ AIService Exception: " + e.getMessage());
             try {
                 return buildAgentFallback(rawText, "Exception: " + e.getMessage());
             } catch (Exception ignore) {
                 return "{\"document_type\":\"unknown\",\"pages\":[{\"page\":1,\"fields\":[],\"tables\":[]}]}";
             }
-        }
-    }
-
-    private void logToLangfuse(String rawInput, String systemPrompt, String userPrompt, String output, long startTime,
-            long endTime) {
-        if (langfusePublicKey == null || langfusePublicKey.isBlank() ||
-                langfuseSecretKey == null || langfuseSecretKey.isBlank()) {
-            return;
-        }
-
-        try {
-            String traceId = UUID.randomUUID().toString();
-            String generationId = UUID.randomUUID().toString();
-            String now = java.time.Instant.now().toString();
-
-            // Prepare batch ingestion payload
-            ObjectNode root = mapper.createObjectNode();
-            ArrayNode batch = root.putArray("batch");
-
-            // 1. Trace Create
-            ObjectNode traceEvent = mapper.createObjectNode();
-            traceEvent.put("id", UUID.randomUUID().toString());
-            traceEvent.put("type", "trace-create");
-            ObjectNode traceBody = traceEvent.putObject("body");
-            traceBody.put("id", traceId);
-            traceBody.put("name", "extract-structured-data");
-            traceBody.put("timestamp", now);
-            batch.add(traceEvent);
-
-            // 2. Generation Create
-            ObjectNode genEvent = mapper.createObjectNode();
-            genEvent.put("id", UUID.randomUUID().toString());
-            genEvent.put("type", "generation-create");
-            ObjectNode genBody = genEvent.putObject("body");
-            genBody.put("traceId", traceId);
-            genBody.put("id", generationId);
-            genBody.put("name", "gpt-4o-mini-extraction");
-            genBody.put("startTime", java.time.Instant.ofEpochMilli(startTime).toString());
-            genBody.put("endTime", java.time.Instant.ofEpochMilli(endTime).toString());
-            genBody.put("model", "gpt-4o-mini");
-
-            // Input/Output
-            ArrayNode inputMsgs = mapper.createArrayNode();
-            inputMsgs.add(mapper.createObjectNode().put("role", "system").put("content", systemPrompt));
-            inputMsgs.add(mapper.createObjectNode().put("role", "user").put("content", userPrompt));
-            genBody.set("input", inputMsgs);
-
-            genBody.put("output", output);
-
-            batch.add(genEvent);
-
-            String jsonPayload = mapper.writeValueAsString(root);
-            String auth = Base64.getEncoder()
-                    .encodeToString((langfusePublicKey + ":" + langfuseSecretKey).getBytes(StandardCharsets.UTF_8));
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(langfuseHost + "/api/public/ingestion"))
-                    .header("Authorization", "Basic " + auth)
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(jsonPayload, StandardCharsets.UTF_8))
-                    .build();
-
-            // Fire and forget (async) or sync but catch error
-            httpClient.sendAsync(request, HttpResponse.BodyHandlers.discarding())
-                    .thenAccept(resp -> {
-                        if (resp.statusCode() >= 400) {
-                            System.err.println("Langfuse ingestion failed: " + resp.statusCode());
-                        }
-                    });
-
-        } catch (Exception e) {
-            System.err.println("Failed to log to Langfuse: " + e.getMessage());
         }
     }
 

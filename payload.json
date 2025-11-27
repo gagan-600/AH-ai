@@ -1,0 +1,1 @@
+{ "batch": [ { "id": "test", "type": "trace-create", "body": { "id": "trace-test", "name": "test", "timestamp": "2025-11-26T10:12:00Z" } } ] }

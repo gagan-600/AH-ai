@@ -10,9 +10,9 @@ services:
       - "5000:5000"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - LANGFUSE_SECRET_KEY=sk-lf-314680af-f692-4a83-87d9-bd3a69168c9f
-      - LANGFUSE_PUBLIC_KEY=pk-lf-cbe6a0d6-a802-48bc-a07b-800e0ea429fa
-      - LANGFUSE_HOST=http://langfuse-web:3000
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+      - LANGFUSE_HOST=${LANGFUSE_HOST}
     networks:
       - handwriting-network
     healthcheck:
